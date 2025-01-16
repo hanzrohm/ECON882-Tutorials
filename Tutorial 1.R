@@ -1,7 +1,7 @@
 ### Preliminaries ###
 
 getwd()                                                                     # Check the working directory 
-setwd("")       # Set the working directory
+setwd("")                                                                   # Set the working directory
 rm(list=ls())                                                               # Clear all 
 
 
@@ -23,9 +23,10 @@ str(mtcars)                                                     # Investigating 
 glimpse(mtcars)                                                 # Gives us a top level overview of the data set 
 head(mtcars,5)                                                  # Prints the first 5 observations
 df <- as.data.frame(mtcars)                                     # Creating a dataframe object with the mtcars data called "df"
+df = as.data.frame(mtcars)                                      # Creating a dataframe object with the mtcars data called "df"
 write.csv(df,"mtcars_export.csv", row.names = TRUE)             # exporting a dataframe object as a .csv file 
 df_import <- data.frame(read.csv("mtcars_export.csv"))          # importing a .csv file as a dataframe object
-c(1,2)                                                          # Atomic vector, R's most basic data structure
+c(1,2)                                                          # Atomic vector, R's most basic data structure, More on this later
          
 ### Data Manipulation          
 
@@ -52,14 +53,12 @@ df %>% group_by(am) %>% summarise(mean(mpg))                    # Average mpg by
 df <- mutate(df, gpm = 1/mpg)                                   # Converting mpg to gpm and adding it as a new column
 head(df)
 df <- df %>% rename(horsepower = hp)                            # Renaming variables, the pipe operator passes the df object as the first argument in the rename() function
-names(df)[names(df) == "horsepower"]  <- "hp"                   # Alternatively, we can rename in this way 
-df_changedorder <- df %>% select(cyl, mpg, everything())        # Changing the order of columns 
 df_selected <- df %>% select(mpg, hp)                           # Selecting a few columns to keep them in the data frame
 hp  <- as.vector(df$hp)                                         # Extracting a column and creating a vector
 btb <- ifelse(hp>200, 1, 0)                                     # Creating dummy variables 
 summary(btb)                                                    # Summarizing the dummy variable 
-df_changedorder <- cbind(btb, df_changedorder)                  # Adding this object to the data frame
-df_sel <- df_changedorder %>% select(-mpg, -cyl)                # Removing variables
+df_btb <- cbind(btb, df)                                        # Adding this object to the data frame
+df_sel <- df_btb %>% select(-mpg, -cyl)                         # Removing variables
 
 ### Data visualization###
 
@@ -67,6 +66,8 @@ df_sel <- df_changedorder %>% select(-mpg, -cyl)                # Removing varia
 
 hist(df$mpg,xlab="miles per gallon",main="Histogram of mpg")    # Histogram
 plot(x=df$wt,y=df$mpg,xlab="weight",ylab="miles per gallon")    # Scatter plot
+
+## ggplot2 package
 
 ggplot(df, aes(x = mpg)) +                                      # First we provide the data, and then define the x-axis variable
   geom_histogram()                                              # Command to plot a histogram
@@ -98,3 +99,7 @@ ols_1 <- lm(mpg ~ cyl + hp + am, data=df)                       # Specifying the
 summary(ols_1)                                                  # Looking at the regression Summary                         
 hatvalues(ols_1)                                                # Extracting Hatvalues, play around with this, read the documentation available online 
 coeftest(ols_1, vcov = vcovHC(ols_1, type = 'HC3'))             # Getting Robust Standard Errors
+
+
+
+
