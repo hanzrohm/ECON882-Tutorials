@@ -15,6 +15,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 # Loading the statsmodels package for statistical models
 import statsmodels.api as sm
+# Loading the statsmodels formula package for R-like formula functionality
+import statsmodels.formula.api as smf
 # Loading data splitting function from the sklearn package
 from sklearn.model_selection import train_test_split
 
@@ -30,7 +32,7 @@ mtcars.head()
 # This is because the head() function is associated with the pandas DataFrame "class".
 # Getting documentation for head function
 help(pd.DataFrame.head)
-# Note that we had to add the function head()'s associated class using .DataFrame
+# Note that we had to add the function head()'s associated class using pd.DataFrame
 # You can also just google a function's documentation quite easily.
 
 # Saving a pandas dataframe as a .csv file
@@ -126,22 +128,13 @@ plt.show()
 mtcars_train, mtcars_test = train_test_split(mtcars,test_size=0.3)
 
 ### OLS Regressions ###
-# This can be done in the statsmodels package, which requires specifying
-# separate dataframes that include the X and y variables explicitly.
-# R's functionality that can use formulas is not supported by default.
 
-# Define X variables
-X = mtcars[['cyl','horsepower','am']]
-# Adding a column of ones for the constant
-X = sm.add_constant(X)
-# Define y variable
-y = mtcars['mpg']
 # Fit the model
-model = sm.OLS(endog=y,exog=X).fit()
+model = smf.ols('mpg ~ cyl + horsepower + am',data=mtcars).fit()
 # Summary of regression results
 print(model.summary())
 # Extracting predicted values
-model.predict(X)
+model.predict(mtcars)
 # Getting robust standard errors
 model_hc3 = model.get_robustcov_results(cov_type='HC3')
 print(model_hc3.summary())
