@@ -78,6 +78,43 @@ new_preds
 # Hint for Assignment 1 Question 2, seq() and rep() may be useful
 
 ### KNN ###
-## Regression using knn.reg
+# Regression using knn.reg
 model_knn = knn.reg(train=df[,c('hp','cyl')],y=df$mpg,k=5)
 model_knn
+
+# Running knn.reg for many values of k
+
+## For loops
+for (i in 1:5){
+    print(i)
+}
+
+for (i in 1:5){
+    odd = (i %% 2)==1
+    if (odd){
+        print(paste0(i," is odd"))
+    } else {
+        print(paste0(i," is even"))
+    }
+}
+
+# Running knn.reg, storing LOO Predictive R^2
+r_sq = c()
+for (i in 1:10){
+    r2pred = knn.reg(train=df[,c('hp')],y=df$mpg,k=i)$R2
+    r_sq = c(r_sq,r2pred)
+}
+r_sq
+
+## Plotting knn predictions
+# Creating grid of x points
+x_grid = seq(min(df$hp),max(df$hp),0.1)
+x_grid
+x_grid_df = data.frame(hp=x_grid)
+x_grid_df
+# Getting predictions for each point in grid
+grid_pred = knn.reg(train=df[,c('hp')],y=df$mpg,k=1,test=x_grid_df)$pred
+grid_pred
+# Plotting prediction curve onto scatterplot
+ggplot(df, aes(x = hp, y = mpg)) + geom_point()
+    + geom_line(color='red', aes(x=x_grid, y=grid_pred))
