@@ -22,7 +22,7 @@ model_disc = lm(mpg ~ factor(cylinders), data=df)
 summary(model_disc)
 
 str(df)
-df$cyl = factor(df$cylinders)
+df$cylinders = factor(df$cylinders)
 str(df)
 
 model_disc = lm(mpg ~ cylinders, data=df)
