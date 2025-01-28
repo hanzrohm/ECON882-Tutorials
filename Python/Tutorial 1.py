@@ -128,7 +128,6 @@ plt.show()
 mtcars_train, mtcars_test = train_test_split(mtcars,test_size=0.3)
 
 ### OLS Regressions ###
-
 # Fit the model
 model = smf.ols('mpg ~ cyl + horsepower + am',data=mtcars).fit()
 # Summary of regression results
