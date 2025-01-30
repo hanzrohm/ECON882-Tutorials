@@ -8,6 +8,9 @@ library(tidyverse)
 library(class)
 library(rsample)
 library(pROC)
+library(FNN)
+library(caret)
+
 
 ### Scaling ###
 
@@ -37,7 +40,6 @@ ggplot(df, aes(x = horsepower, y = weight)) +
   # Scale for color
   scale_color_gradient(limits = c(11, 19)) +
   labs(title = "Scatterplot with 5 Nearest Neighbors",
-       subtitle = "Blue: Reference Point | Red: Nearest Neighbors",
        x = "Horsepower", y = "Weight")
 
 # KNN with scaling.
@@ -52,7 +54,6 @@ ggplot(df, aes(x = shp, y = sw)) +
   geom_point(data = df[10,], aes(x = shp, y = sw, color = mpg), size = 4, shape = 17) +  # Reference point
   scale_color_gradient(limits = c(11, 19)) +
   labs(title = "Scatterplot with 5 Nearest Neighbors",
-       subtitle = "Blue: Reference Point | Red: Nearest Neighbors",
        x = "Horsepower", y = "Weight")
 
 # Custom Functions
@@ -122,6 +123,7 @@ head(df)
 df$student = as.numeric(df$student=='Yes')
 df$default = as.numeric(df$default=='Yes')
 head(df)
+
 # Splitting sample
 df_split = initial_split(data = df, prop = 0.7)
 df_train = training(df_split)
@@ -147,6 +149,7 @@ df_test_y = df_test$default
 knn_class = knn(train = df_train_X, cl = df_train_y, test = df_test_X, k=10)
 knn_conf = table(knn_class,df_test_y)
 knn_conf
+
 # Logistic Regression classification
 logit = glm(formula = default ~ ., data=df_train, family = binomial)
 summary(logit)

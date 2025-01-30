@@ -132,7 +132,7 @@ df_test_y = df_test.loc[:,'Species']
 # sample standard deviation in the training sample is 1. We then subtract the same
 # mean and SD to the other two samples (in this case, only the test sample).
 
-# First, we will compute the means and SD in the training sample for each variable
+# First, we will compute the means and SDs in the training sample for each variable
 # using numpy's mean and std functions, which can be calculated for an entire
 # dataframe, or as we need, across an axis (in this case, across rows).
 means = np.mean(df_train_X,axis=0)
