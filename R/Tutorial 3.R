@@ -13,11 +13,10 @@ library(pROC)
 
 # Loading a dataset
 df = as.data.frame(Auto)
-df$gpm = 1/df$mpg
-# For the example, we will try to predict gpm based on horsepower and weight.
+# For the example, we will try to predict mpg based on horsepower and weight.
 # Scaling with baseR
 df[,c('shp','sw')] = scale(df[,c('horsepower','weight')])
-
+head(df)
 ## Why scaling is important for KNN ##
 
 # KNN without scaling.
