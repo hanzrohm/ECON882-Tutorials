@@ -144,17 +144,91 @@ SDs = np.std(df_train_X,axis=0,ddof=1)
 # Unfortunately, scale() does not support passing in custom means and SDs
 # like the scale() function in R. sklearn has a built-in procedure that
 # automatically scales test data based on means and SDs from training samples.
-# This is handled by its "Pipeline" process. We will go through an example
-# of this at the end of this tutorial. For now, we will manually scale the
-# data. Let's write a function that can do this (essentially coding R's
-# scale() function).
+# This is handled by its "Pipeline" workflow. We will go through an example
+# of this later. For now, we will manually scale the data. Let's write a 
+# function that can do this (essentially coding R's scale() function).
 def Rscale(X, means=None, sds=None, ax=0):
     # Calculate means if not given
-    if isna(means:
+    if means is None:
         means = np.mean(X,axis=ax)
     # Calculate sds if not given
-    if ~sds:
+    if sds is None:
         sds = np.std(X,axis=ax,ddof=1)
     return (X - means)/sds
 df_train_X = Rscale(df_train_X)
 df_test_X = Rscale(df_test_X,means,SDs)
+
+# Now we can run knn classification.
+knn_class = knn(n_neighbors=5).fit(X=df_train_X,y=df_train_y)
+
+# Getting training-sample predictions
+knn_pred = knn_class.predict(X=df_test_X)
+
+# Confusion matrix
+from sklearn.metrics import confusion_matrix as cmat
+conf_mat = cmat(y_true = df_test_y, y_pred = knn_pred)
+conf_mat
+
+### Classification using Logistic Regression ###
+# Loading data
+df = pd.read_csv("../Datasets/default.csv",index_col=0)
+
+# Classification for default.
+df.student = 1*(df.student=='Yes')
+df.default = 1*(df.default=='Yes')
+
+# Splitting sample
+df_train, df_test = train_test_split(df,test_size=0.3)
+
+# Scaling inputs
+means = np.mean(df_train[['balance','income']],axis=0)
+SDs = np.std(df_train[['balance','income']],axis=0,ddof=1)
+
+df_train[['balance','income']] = Rscale(df_train[['balance','income']])
+df_test[['balance','income']] = Rscale(df_test[['balance','income']],means,SDs)
+
+df_train_X = df_train.drop('default',axis=1)
+df_test_X = df_test.drop('default',axis=1)
+df_train_y = df_train.default
+df_test_y = df_test.default
+
+# KNN classification for comparison
+knn_class = knn(n_neighbors=10).fit(X=df_train_X,y=df_train_y)
+knn_pred = knn_class.predict(X=df_test_X)
+knn_conf = cmat(y_true=df_test_y,y_pred=knn_pred)
+
+# Logistic Regression classification
+# We will use sklearn's implementation of logistic regression.
+from sklearn.linear_model import LogisticRegression
+
+logit_class = LogisticRegression(penalty=None).fit(X=df_train_X,y=df_train_y)
+# By default, LogisticRegression() applies a ridge regularization penalty to the logit
+# objective function. It is not necessarily a bad thing to do, but applying it by
+# default without any thought is probably not sensible, especially if we are interested
+# in inference about any predictors.
+logit_pred = logit_class.predict(X=df_test_X)
+logit_conf = cmat(y_true=df_test_y,y_pred=logit_pred)
+logit_conf
+# .predict() classifies observations in to the class with the highest predicted
+# probability. For this binary case, this corresponds to a threshold of 0.5 by
+# definition. To get the predicted probabilities we can use predict_proba() instead.
+logit_prob = logit_class.predict_proba(df_test_X)
+logit_prob
+# Note that it returns an matrix of size Nxk where k is the number of classes, and
+# each element corresponds to P(y_i=k). In addition, the columns are ordered. So the
+# second column corresponds to the class 1.
+logit_pred = 1*(logit_prob[:,1]>0.5)
+logit_conf = cmat(y_true=df_test_y,y_pred=logit_pred)
+logit_conf
+# This gives the same confusion matrix as before.
+# Now that we have the probabilities, we can create an ROC curve. We will use sklearn
+# for this as well.
+from sklearn.metrics import RocCurveDisplay
+RocCurveDisplay.from_predictions(df_test_y,logit_prob[:,1])
+# We can also pass in a model to get these predictions by using from_estimator() instead.
+RocCurveDisplay.from_estimator(estimator=logit_class,X=df_test_X,y=df_test_y)
+# This function calls matplotlib functions, so you can add in any standard matplotlib
+# functionality. For example,
+RocCurveDisplay.from_predictions(df_test_y,logit_prob[:,1])
+plt.xlabel("FPR")
+plt.ylabel("TPR")
