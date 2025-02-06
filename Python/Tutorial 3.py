@@ -141,4 +141,20 @@ SDs = np.std(df_train_X,axis=0,ddof=1)
 # dividing the sum of squared deviations by N, thus computing the population
 # standard deviation. ddof=1 will divide by N-1, computing the sample standard deviation.
 
-df_train_X = scale(df_train_X,with_mean=means,with_std=SDs)
+# Unfortunately, scale() does not support passing in custom means and SDs
+# like the scale() function in R. sklearn has a built-in procedure that
+# automatically scales test data based on means and SDs from training samples.
+# This is handled by its "Pipeline" process. We will go through an example
+# of this at the end of this tutorial. For now, we will manually scale the
+# data. Let's write a function that can do this (essentially coding R's
+# scale() function).
+def Rscale(X, means=None, sds=None, ax=0):
+    # Calculate means if not given
+    if isna(means:
+        means = np.mean(X,axis=ax)
+    # Calculate sds if not given
+    if ~sds:
+        sds = np.std(X,axis=ax,ddof=1)
+    return (X - means)/sds
+df_train_X = Rscale(df_train_X)
+df_test_X = Rscale(df_test_X,means,SDs)
