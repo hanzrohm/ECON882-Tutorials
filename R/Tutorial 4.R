@@ -8,7 +8,7 @@ library(tidyverse)
 library(caret)
 library(rsample)
 library(FNN)
-# glment library for regularization with generalized linear models.
+# glmnet library for regularization with generalized linear models.
 library(glmnet)
 
 ### Regularization ###
@@ -85,7 +85,7 @@ net_reg_cv = cv.glmnet(X,y,family='gaussian',alpha=0.5,lambda.min=0.000001)
 plot(net_reg_cv)
 
 # Regularization using caret
-testgrid = expand.grid(alpha=seq(0,1,0.1),lambda=c(0.000001,7,0.001))
+testgrid = expand.grid(alpha=seq(0,1,0.1),lambda=seq(0.000001,7,0.001))
 
 train_control = trainControl(method='cv',number = 10)
 net_caret = train(mpg ~ . - name, data=df, method='glmnet', trControl = train_control, tuneGrid = expand.grid(alpha = 1, lambda=lmin))
@@ -122,6 +122,7 @@ plot(lasso_logit_cv)
 lasso_logit_cv$lambda.min
 
 # Using caret
+train_control = trainControl(method='cv',number = 10)
 net_class = train(factor(Direction) ~ factor(Year) + . - Today, data=df_train, method='glmnet', trControl = train_control, tuneLength = 50)
 net_class
 net_pred = predict(net_class,df_test)
