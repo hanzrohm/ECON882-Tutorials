@@ -74,8 +74,8 @@ coef(lasso_reg,s=0.01)
 
 lasso_reg_cv = cv.glmnet(X,y,family='gaussian',alpha=1,lambda.min=0.000001)
 plot(lasso_reg_cv)
-lmin = ridge_reg_cv$lambda.min
-l1se = ridge_reg_cv$lambda.1se
+lmin = lasso_reg_cv$lambda.min
+l1se = lasso_reg_cv$lambda.1se
 coef(lasso_reg_cv,s=lmin)
 coef(lasso_reg_cv,s=l1se)
 lasso_reg_cv$glmnet.fit
