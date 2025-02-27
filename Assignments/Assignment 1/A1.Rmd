@@ -1,0 +1,148 @@
+---
+title: "ECON882 Assignment 1"
+author: "Mehtab Hanzroh"
+date: "2025-02-19"
+output: pdf_document
+---
+
+# ECON882 Assignment 1
+
+### Importing Libraries
+
+```{r libraries, include=FALSE}
+library(tidyverse)
+library(FNN)
+```
+
+### Loading Data
+
+```{r load_data}
+setwd("/media/mehtab/6266-3261/Documents/PhD/TA/ECON882 Winter 2024")
+df = read.csv("men2015b.csv")
+```
+
+## Question 1
+
+First we will create the log(earnings) variable.
+
+```{r log_earn}
+df$logearn = log(df$earnings)
+```
+
+Let's start by looking at the pairs plot.
+
+```{r pairs_plot}
+pairs(df[,c("logearn","age","educ","marry")])
+```
+
+"marry" is a dummy variable, so we will include this in the model as is. "educ" is a categorical variable, so we will include dummy variables for each of its levels (except for one of-course). Including it on its own would be a mistake, since it assumes the effect on earnings from each jump in education levels is identical. This is easily verified graphically by plotting the distribution (boxplot) of logearn for each level of educ. This is simple in ggplot.
+```{r earnxeduc}
+(ggplot(df, aes(x=factor(educ),y=logearn)) +
+    geom_boxplot() +
+    theme_minimal() +
+    labs(x='Education Level',y='Log(earnings)',title='Boxplot of Log(earnings) by Education Level'))
+```
+Note. It is the fact that we surrounded educ by factor() that generates a separate boxplot for each level of educ.
+
+The relation is clearly non-linear. The relation between logearn and age is hard to see from the pairs plot, so let's create the same plot for the mean of logearn by age.
+
+```{r earnxage}
+(ggplot(df, aes(x=factor(age),y=logearn)) +
+    geom_boxplot() + 
+    theme_minimal() +
+    labs(x='Age',y='Log(earnings)',title='Boxplot of Log(earnings) by Age') +
+    scale_x_discrete(guide = guide_axis(n.dodge = 2)))
+```
+
+A quadratic relation between logearn and age seems appropriate. Let's estimate the relevant linear regression model.
+
+```{r ols}
+model = lm(logearn ~ age + I(age^2) + factor(educ) + marry, data=df)
+summary(model)
+```
+All variables are highly significant. A cubic term for age may be appropriate as well, so let's see if it is important for the regression fit.
+```{r ols_cubic_age}
+model_cubic = lm(logearn ~ age + I(age^2) + I(age^3) + factor(educ) + marry, data=df)
+summary(model_cubic)
+```
+While the coefficient on the squared term does change (note we did not use orthogonal polynomials), the fit hardly changes. We will thus proceed without the cubic term, to be parsimonious and avoid over-fitting concerns. Some of you may also test using interactions, but in my testing interactions do not improve fit very much, and raise over-fitting concerns.
+
+## Question 2
+To get these predictions, we need to create a dataframe with the relevant data. Since the hypothetical individuals have different combinations for each possible values of age, educ, and marital status, this is simple with `expand.grid()`.
+```{r hyp_df}
+hyp_df = expand.grid(age=c(30,40,50,60,70), educ=c(4,5), marry=c(0,1))
+hyp_df = cbind(hyp_df,predict(model,hyp_df,level=.99,interval="prediction"))
+hyp_df
+```
+Earnings are maximized for individual 18 in the dataframe, a 50 year old, with the highest level of education and who is married. This is not surprising given the graphs above.
+
+## Question 3
+We will estimate with `knn.reg()`. caret does not implement the efficient LOOCV algorithm for KNN discussed in class, and thus using it will take a prohibitively long time.
+```{r knn}
+ks = seq(1,100,1)
+r_sq = c()
+for (i in ks){
+    r2pred = knn.reg(train=df[,c('age','educ','marry')],y=df$logearn,k=i)$R2Pred
+    r_sq = c(r_sq,r2pred)
+}
+optk = ks[which.max(r_sq)]
+paste0('The maximum LOO Predictive R-squared is ',round(max(r_sq),5),' corresponding to a value of k=',optk,'.')
+```
+There are a number of reasons k is larger than in the lecture and tutorial examples. First and foremost, the data is relatively large with 32,437 observations. Higher values of k help avoid overfitting concerns, especially when the variance in the data is so large as seen from the graphs above. In addition, since age is so much larger in scale than the other variables, it will dominate the others in distance calculations. Intuitively, many observations have similar values for the explanatory variables in large datasets, and in this case many observations have similar values for the age variable. Using more neighbours to form predictions may allow for more information on the other variables to inform predictions.
+
+## Question 4
+```{r hyp_knn}
+knn_pred = knn.reg(train=df[,c('age','educ','marry')],y=df$logearn,test=hyp_df[,c('age','educ','marry')],k=optk)$pred
+hyp_df$knn_pred = knn_pred
+hyp_df
+```
+The KNN predictions differ significantly from the OLS predictions for some individuals. In general, education and marital status do not seem to have a monotonic effect on earnings. That education does not is quite surprising given the graph above. This is likely due to the fact that age is dominating distance calculations when we compute nearest neighbours, and does not allow for education and marital status to be influential in predictions.
+
+## Question 5
+We will not scale marry since it is already a dummy variable.
+```{r scale}
+means = colMeans(df[,c('age','educ')])
+means
+SDs = apply(df[,c('age','educ')],2,sd)
+SDs
+scaleX = data.frame(scale(df[,c('age','educ')],means,SDs))
+scaleX$marry = df$marry
+```
+Now we can run the KNN model on these scaled variables.
+```{r knn2}
+r_sq_sc = c()
+for (i in ks){
+    r2pred = knn.reg(train=scaleX,y=df$logearn,k=i)$R2Pred
+    r_sq_sc = c(r_sq_sc,r2pred)
+}
+optk_sc = ks[which.max(r_sq_sc)]
+paste0('The maximum LOO Predictive R-squared is ',round(max(r_sq_sc),5),' corresponding to a value of k=',optk_sc,'.')
+```
+While the optimal k does not change much (59 vs. 58), the R-squared is a bit higher (0.283 vs 0.286), so the scaling seems to have helped a little bit. We can also try using "normalization" instead of "standardization" as we have currently done. This way, the variables would all range from 0-1.
+```{r norm}
+normalize = function(X){
+  scale(X, apply(X, 2, min), apply(X, 2, max) - apply(X, 2, min))
+}
+normX = normalize(df[,c('age','educ','marry')])
+```
+Note that this function does not do anything to the marry dummy variable.
+```{r knn_norm}
+r_sq_nm = c()
+for (i in ks){
+    r2pred = knn.reg(train=normX,y=df$logearn,k=i)$R2Pred
+    r_sq_nm = c(r_sq_nm,r2pred)
+}
+optk_nm = ks[which.max(r_sq_nm)]
+paste0('The maximum LOO Predictive R-squared is ',round(max(r_sq_nm),5),' corresponding to a value of k=',optk_nm,'.')
+```
+The optimal k seems to have changed a lot, and the R-squared is actually a bit higher than when using scaling via standardization. The status quo approach when scaling variables is almost always standardization, although using KNN when dummy variables are needed is not generally recommended. In either case, scaling variables allows KNN to consider changes in the educ and marry variables as having relatively more importance to predictions than without scaling (due to distance calculations), which explains why the model performs better. As the graphs and OLS results showed, these are important predictors of earnings.
+
+## Question 6
+```{r knn_pred_sc}
+hyp_scale = data.frame(scale(hyp_df[,c('age','educ')],means,SDs))
+hyp_scale$marry = hyp_df$marry
+knn_pred_sc = knn.reg(train=scaleX,y=df$logearn,test=hyp_scale,k=optk_sc)$pred
+hyp_df$knn_pred_sc = knn_pred_sc
+hyp_df
+```
+The predictions seem to differ quite a bit from the KNN model that does not scale. The changes in predictions moving to higher education levels and marital status seem to make more sense, with both generally having a positive effect on earnings.

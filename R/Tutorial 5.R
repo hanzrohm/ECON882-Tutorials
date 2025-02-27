@@ -23,7 +23,7 @@ df_train = training(df_split)
 df_test = testing(df_split)
 
 set.seed(5)
-pcr_fit = pcr(mpg ~ displacement + horsepower + weight + acceleration,data = df_train ,scale = TRUE, validation = "CV")
+pcr_fit = pcr(mpg ~ displacement + horsepower + weight + acceleration, data = df_train, scale = TRUE, validation = "CV")
 summary(pcr_fit)
 validationplot(pcr_fit,val.type = 'MSEP')
 pcr_pred = predict(pcr_fit,df_test,ncomp = 2)
@@ -35,8 +35,8 @@ y_train = as.matrix(df_train[,'mpg'])
 X_test = model.matrix(mpg ~ displacement + horsepower + weight + acceleration -1 ,data = df_test)
 y_test = as.matrix(df_test[,'mpg'])
 
-
-lasso_reg_cv = cv.glmnet(X_train,y_train,family='gaussian',alpha=1,lambda.min=0.000001)
+set.seed(5)
+lasso_reg_cv = cv.glmnet(X_train,y_train,family='gaussian',alpha=1,lambda.min=0,nlambda=1000)
 plot(lasso_reg_cv)
 lmin = lasso_reg_cv$lambda.min
 lasso_pred = predict(lasso_reg_cv,X_test)
@@ -86,7 +86,7 @@ ggplot(data=df,mapping=aes(x=mpg)) + geom_histogram(aes(y = ..density..)) +
 
 ## Generate Data ##
 
-n  = 101
+n  = 10001
 x  = seq(0, 1, length.out = n)
 fx = sin(2 * pi * x)
 set.seed(1234)
@@ -105,6 +105,7 @@ lines(x, fx, lwd = 2, col = "black")
 legend("topright", legend = c("f(x)", "Polynomial"), lty = 1, lwd = 2,
        col = c("blue", "black"))
 
+
 ## Splines ##
 
 # Selecting knots by visual inspection
@@ -115,6 +116,7 @@ bs_pred = predict(lm_bspline, se = T)
 plot(x, y, col = 'azure4', ylab = "y")
 lines(x, fx, lty = 1, lwd = 2, col = "black")
 lines(x, fitted(lm_bspline), lwd = 2, col = "red")
+
 # Natural Splines
 k2 = c(0.25,0.5,0.8)
 lm_nspline = lm(y ~ ns(x, knots = k) - 1)
@@ -140,7 +142,6 @@ lines(x, fx, lty = 1, lwd = 2, col = "black")
 lines(x, smth_spline$y, lty = 1, lwd = 2, col = "purple")
 lines(x, smth_spline2$y, lty = 1, lwd = 2, col = "cyan")
 
-
 # Plotting all prediction lines
 plot(x, y, col = 'azure4', ylab = "y")
 lines(x, fx, lty = 1, lwd = 2, col = "black")
@@ -150,5 +151,5 @@ lines(x, fitted(lm_nspline), lwd = 2, col = "orange")
 lines(x, fitted(lm_nspline2), lwd = 2, col = "green")
 lines(x, smth_spline$y, lty = 1, lwd = 2, col = "purple")
 lines(x, smth_spline2$y, lty = 1, lwd = 2, col = "cyan")
-legend("bottomleft", legend = c("f(x)", "Polynomial", "B-Spline", "N-Spline (2 Knots)", "N-Spline (3 Knots)", "Smoothing Spline (10 Knots)", "Smoothing Spline"),
+legend("topright", legend = c("f(x)", "Polynomial", "B-Spline", "N-Spline (2 Knots)", "N-Spline (3 Knots)", "Smoothing Spline (10 Knots)", "Smoothing Spline"),
        lty = 1, lwd = 2, col = c("black", "blue", "red", "orange", "green", "purple", "cyan"))
