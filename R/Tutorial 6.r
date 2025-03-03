@@ -1,160 +1,143 @@
-### GAM ###
-rm(list = ls())                                                  
-library(tidyverse)                                                                                # Loading tidyverse for data manipulation
-library(gam)                                                                                      # Loading gam for general additive models 
-library(tree)                                                                                     # Loading tree for decision trees
-library(expss)                                                                                    # Loading expss for variable labels
-library(rsample)                                                                                  # Loading rsample for data splitting
-library(randomForest)                                                                             # Loading randomForest for random forests
-library(rpart)
-library(rpart.plot)
-library(mlbench)
-library(gbm)
-set.seed(1971)
+### Preliminaries ###
 
-### using the gam package ###                                             
- 
-df         <- as.data.frame(ISLR::Auto)                                                           # Loading the auto data
-df         <- df %>% mutate(gpm = 1/mpg)                                                          # Reating gpm
-prop       <- 0.70                                                                                # Training proportion
-train.idx  <- sample(1:nrow(df), size = floor(nrow(df)*prop))                                     # getting the indices for the training set
-df_train   <- df[train.idx,]                                                                      # Extracting the training set
-df_test    <- df[-train.idx,]                                                                     # Extracting the testing set
-lm.model   <- lm(gpm ~ horsepower + factor(origin), data = df_train)                              # Fitting a linear model
-pred.lm    <- predict(lm.model, df_test)                                                          # Predicting using the linear model
-gam.model  <- gam(gpm ~ s(horsepower) + factor(origin), data = df_train)                          # Fitting a GAM
-pred.gam   <- predict(gam.model,newdata = df_test)                                                # Predicting using the GAM
-                     
-### using the mgcv package ###                     
-                     
-detach("package:gam", unload = TRUE)                                                              # Detaching the gam package     
-library(mgcv)                                                                                     # Loading the mgcv package
-gam.mod.2  <- gam(gpm ~ s(horsepower) + factor(origin), data = df_train)                          # Fitting the gam model using mgcv
-pred.gam.2 <- predict.gam(gam.mod.2, df_test)                                                     # Predicting with the new model
-Metrics::rmse(df_test[, 10], pred.lm)                                                             # RMSE for the first GAM model
-Metrics::rmse(df_test[, 10], pred.gam.2)                                                          # RMSE for the second GAM model
-          
-detach("package:mgcv", unload=TRUE)                                                               # Unloading the mgcv package
+setwd("")
 
-### Loading the Boston Housing Data ###
-rm(list=ls())                                                                                     # Clearing the environment
-set.seed(1507)                                                                                    # Setting the seed
-data(BostonHousing2)                                                                              # Loading the boston housing data                                                          
-df <- BostonHousing2                                                                              # Creating a data frame object with the data
-rm(BostonHousing2)                                                                                # Removing the redundant one 
+### Loading Libraries ###
+library(ISLR2)
+library(tidyverse)
+library(rsample)
+# gam library to estimate gam's
+library(gam)
+# Metrics library for measures of fit
+library(Metrics)
+# expss library for useful dataframe functions
+library(expss)
+# GGally library for improved pairs plot
+library(GGally)
 
-### Specifying Variable Labels ###
+### GAMs ###
+# Loading a Dataset
+df = data.frame(Auto)
+df$gpm = 1/df$mpg
+pairs(df%>%select(-mpg))
 
-df <- apply_labels(df,                                                                            # Adding variable labels
-                   crim    =	"per capita crime rate by town",
-                   zn      =	"proportion of residential land zoned for lots over 25,000 sq.ft",
-                   indus	  = "proportion of non-retail business acres per town",
-                   chas	  = "Charles River dummy variable (= 1 if tract bounds river; 0 otherwise)",
-                   nox     = "nitric oxides concentration (parts per 10 million)",
-                   rm	    = "average number of rooms per dwelling",
-                   age	    = "proportion of owner-occupied units built prior to 1940",
-                   dis	    = "weighted distances to five Boston employment centres",
-                   rad	    = "index of accessibility to radial highways",
-                   tax	    = "full-value property-tax rate per USD 10,000",
-                   ptratio	= "pupil-teacher ratio by town",
-                   b	      = "1000(B - 0.63)^2 where B is the proportion of blacks by town",
-                   lstat	  = "percentage of lower status of the population",
-                   medv	  = "median value of owner-occupied homes in USD 1000's",
-                   cmedv	  = "corrected median value of owner-occupied homes in USD 1000's",
-                   town	  = "name of town",
-                   tract	  = "census tract",
-                   lon	    = "longitude of census tract",
-                   lat	    = "latitude of census tract"
-)
+# Splitting the sample
+set.seed(6)
+df_split = initial_split(data = df, prop = 0.7)
+df_train = training(df_split)
+df_test = testing(df_split)
 
-### Data Clean Up ###
+# Simple use-case, smoothing spline basis functions
+lm_model = lm(gpm ~ horsepower + factor(origin), data = df_train)
+pred_lm  = predict(lm_model, df_test)
+gam_lm = gam(gpm ~ horsepower + factor(origin), data = df_train)
+pred_gamlm = predict(gam_lm,newdata = df_test)
+sum(pred_lm != pred_gamlm)
+gam_model = gam(gpm ~ s(horsepower) + factor(origin), data = df_train)
+pred_gam = predict(gam_model,newdata = df_test)
+par(mfrow=c(2,1))
+plot(gam_model)
+gam_model
+summary(gam_model)
+rmse(df_test[,'gpm'], pred_gam)
+rmse(df_test[,'gpm'], pred_gamlm)
 
-str(df)                                                                                           # Looking at the structure of the data 
-extras             <- df[,15:19]                                                                  # Extracting the extra variables (more on this later)
-df                 <- df %>% dplyr::select(-cmedv, -town, -tract, -lon, -lat)                     # Removing the extras from the data frame
+detach("package:gam", unload = TRUE)
+# mgcv package for estimating gams, more general than gam package
+library(mgcv)
+gam_model = gam(gpm ~ s(horsepower,bs='cr') + factor(origin), data = df_train)
+pred_gam = predict(gam_model,newdata = df_test)
+par(mfrow=c(2,1))
+plot(gam_model)
+gam_model
+summary(gam_model)
+rmse(df_test[,'gpm'], pred_gam)
+rmse(df_test[,'gpm'], pred_gamlm)
 
-### Specifying Covariates and the Model Formula ###
+# Partial regression plot, partialling out factor(origin) (and intercept)
+gpmresid = lm(gpm ~ factor(origin), data = df_train)$resid
+hpresid = lm(horsepower ~ factor(origin), data = df_train)$resid
+residdf = data.frame(gpm=gpmresid,hp=hpresid)
+ggplot(residdf,mapping=aes(x=hp,y=gpm)) + geom_point()
+# Modest non-linear relationship leads to improvement in RMSE from using smoothing spline
 
-covariates         <- names(df[,2:13])                                                            # Specifying the covariates
-fmla               <- formula(paste0("medv ~", paste0(covariates, collapse ="+")))                # Specifying the formula
+gam_model2 = gam(gpm ~ horsepower + displacement + weight + acceleration + factor(cylinders) + factor(origin), data = df_train)
+pred_gam2 = predict(gam_model2,newdata = df_test)
+gam_model3 = gam(gpm ~ s(horsepower,bs='cr') + s(displacement,bs='cr') + s(weight,bs='cr') + s(acceleration,bs='cr') + factor(cylinders) + factor(origin), data = df_train)
+pred_gam3 = predict(gam_model3,newdata = df_test)
+rmse(df_test[,'gpm'], pred_gam2)
+rmse(df_test[,'gpm'], pred_gam3)
 
-### Data Splitting ###
+# Generating train-validation-test samples, 50-25-25 breakdown
+set.seed(6)
+# Writing function to generate splits
+trainvaltestsplit = function(df,props) {
+  df_split = initial_split(data = df, prop = props[1])
+  df_train = training(df_split)
+  df_temp = testing(df_split)
+  df_split2 = initial_split(data = df_temp, prop = props[2]/(props[2]+props[3]))
+  df_val = training(df_split2)
+  df_test = testing(df_split2)
+  return(list(trainingset = df_train, validationset = df_val, testset = df_test))
+}
+df_splits = trainvaltestsplit(df,c(0.5,0.25,0.25))
 
-df.split           <- initial_split(df, 0.50)                                                     # Creating the initial split object
-df.train           <- training(df.split)                                                          # Extracting the trainig set
-df.test            <- testing(df.split)                                                           # Extracting the testing set
+pred_gam2_val = predict(gam_model2,newdata = df_val)
+pred_gam3_val = predict(gam_model3,newdata = df_val)
+rmse(df_val[,'gpm'], pred_gam2_val)
+rmse(df_val[,'gpm'], pred_gam3_val)
+pred_gam2_test = predict(gam_model2,newdata = df_test)
+pred_gam3_test = predict(gam_model3,newdata = df_test)
+rmse(df_test[,'gpm'], pred_gam2_test)
+rmse(df_test[,'gpm'], pred_gam3_test)
+AIC(gam_model2,gam_model3)
+# Improvement is not as large in test set. Model comparisons should be done in validation sample, final statistic should be reported from test sample.
 
-### Random Forest First Run and Variable Importance ###
+# Case Study with Boston Housing Data
 
-rf.1               <- randomForest(medv ~., df.train, mtry =13, importance = TRUE)                # Fitting the initial random forest 
-VI.plot            <- varImpPlot(rf.1, sort = TRUE,                                               # Plotting Variable importance, and sorting 
-                                 main = "Training Set Variable Importance")                       # Creating the Title
+# Model of House Value
+df = data.frame(Boston)
+ggpairs(df)
 
-### Trying Values of mtry 1 through p ###
+# Splitting the sample
+set.seed(6)
+df_splits = trainvaltestsplit(df,c(0.5,0.25,0.25))
 
-oob.error          <- vector("numeric", 13)                                                       # Creating an empty vector for out of bag errors                                               
-test.error         <- vector("numeric", 13)                                                       # Creating an empty vector for test mean squared errors  
-for(mtry in 1:13){                                                                                # Setting a for loop for trying values of mtry
-  rf               <- randomForest(medv ~ . , data = df.train, mtry=mtry,                         # Specifying the formula, the data, and mtry for each random forest 
-                                   ntree=500, importance = TRUE)                                  # Setting number of trees to 500, and calculating importance in the background
-  oob.error[mtry]  <- rf$mse[500]                                                                 # Extracting the out of bag errors
-  pred             <- predict(rf,df.test)                                                         # Making predictions on the test set 
-  test.error[mtry] <- with(df.test, mean((medv - pred)^2))                                        # Calculating the test set errors
-  cat(mtry," ")                                                                                   # For visualizing which iteration the loop is in 
-}                                                                                                 # Closing the loop 
-results            <- cbind(test.error, oob.error)                                                # Storing the errors into a results table
-mtry.1             <- which.min(test.error)                                                       # Getting the mtry value based on test error 
-
-### Getting Best mtry Value Based on OOB Error ###
-
-mtry               <- tuneRF(df.train[,1:13],df.train[,14], ntreeTry=500,                         # Getting best mtry based on oob error estimate         
-                             stepFactor=1.5, improve=0.01, trace=TRUE, plot=TRUE)                 # Setting mtry to change bu a facto of 1.5
-best.m <- mtry[mtry[, 2] == min(mtry[, 2]), 1]                                                    # Extracting the best mtry
-print(mtry)                                                                                       # Printing mtry
-print(best.m)                                                                                     # Printing best.m based on oob error
-
-### Fitting the Best RF Model ###
-
-rf.best            <- randomForest(medv ~., data=df.train,                                        # Specifying the formula, and the data
-                                   mtry = best.m,                                                 # Specifying the mtry value
-                                   importance = TRUE)                                             # Calculating importance in the background
-plot(rf.best, type = "l", main = "RF Error vs. ntrees")                                           # Plotting the random forest
-n.tree.best        <- which.min(rf.best$mse)                                                      # Getting the optimal number of trees
-rf.best            <- randomForest(medv ~., df.train,                                             # Defining the formula, and the data
-                                   mtry=best.m,                                                   # Specifying the mtry value 
-                                   importance = TRUE,                                             # Calculating variable importance in the background
-                                   ntree = n.tree.best)                                           # Specifying the number of trees
-predictions        <- predict(rf.best, df.test, interval = "prediction")                          # Getting the predictions 
-trmse              <- Metrics::rmse(df.test$medv, predictions)                                    # Calculating test root mean squared error
-
-### RF CV ###
-
-cv.result          <- rfcv(df.train[,1:13], df.train[,14],                                        # Getting cross validated prediction performance of different models
-                           cv.fold = 5, step = 0.5,                                               # With sequentially reducing the number of predictors (ranked by variable importance)
-                           mtry=function(p) max(1, floor(sqrt(p))))                               # Specifying mtry values 
-with(cv.result, plot(n.var, error.cv, log="x", type="o", lwd=2))                                  # Printing the results 
-
-### Gradient Boosting ###
-
-df.train <- df.train %>% mutate(val = ifelse(medv > mean(medv), 1, 0))                            # Creating a target variable 
-df2 <- df.train %>% select(-medv)                                                                 # Removing its continuous counterpart
-
-
-medv_gbm <- gbm(                                                                                  # Boosting using the gbm() function
-  formula = val ~ .,                                                                              # Defining the formula
-  data = df2,                                                                                     # Specifying the data
-  distribution = "bernoulli",                                                                     # Bernouli distribution because our target is binary
-  n.trees = 5000,                                                                                 # Setting the number of trees
-  shrinkage = 0.1,                                                                                # Learning Rate 
-  interaction.depth = 3,                                                                          # Specifying the depth
-  n.minobsinnode = 5,                                                                             # higher values prevent over fitting
-  cv.folds = 10                                                                                   # Number of CV folds
-)                                                     
-                                                      
-best <- which.min(medv_gbm$cv.error)                                                              # Identifying the one with the lowest error
-sqrt(medv_gbm$cv.error[best])                                                                     # Fitting the best
-gbm.perf(medv_gbm, method = "cv")                                                                 # Tuning using build in functions
-pred.gbm <- predict(medv_gbm, df.test, type = "response")                                         # Predicting
-
-
-
+# Baseline linear model
+hv_lm = lm(medv~.+I(lstat^2)+I(dis^2)+I(nox^2), data=df_splits$trainingset)
+summary(hv_lm)
+lm_pred = predict(hv_lm,df_splits$validationset)
+# GAM with smoothing splines to capture nonlinearity
+hv_gam1 = gam(medv~s(lstat,bs='cr')+s(dis,bs='cr')+s(nox,bs='cr')+s(crim,bs='cr')+zn+indus+chas+rm+age+rad+tax+ptratio, data=df_splits$trainingset)
+summary(hv_gam1)
+par(mfrow=c(1,4))
+plot.gam(hv_gam1)
+gam1_pred = predict(hv_gam1,df_splits$validationset)
+rmse(df_splits$validationset$medv, lm_pred)
+rmse(df_splits$validationset$medv, gam1_pred)
+# GAM with natural splines
+hv_gam2 = lm(medv~ns(lstat,8)+ns(dis,8)+ns(nox,5)+ns(crim,2)+zn+indus+chas+rm+age+rad+tax+ptratio, data=df_splits$trainingset)
+summary(hv_gam2)
+gam2_pred = predict(hv_gam2,df_splits$validationset)
+rmse(df_splits$validationset$medv, lm_pred)
+rmse(df_splits$validationset$medv, gam1_pred)
+rmse(df_splits$validationset$medv, gam2_pred)
+# GAM with cubic splines
+hv_gam3 = lm(medv~bs(lstat,8)+bs(dis,8)+bs(nox,5)+bs(crim,2)+zn+indus+chas+rm+age+rad+tax+ptratio, data=df_splits$trainingset)
+summary(hv_gam3)
+gam3_pred = predict(hv_gam3,df_splits$validationset)
+rmse(df_splits$validationset$medv, lm_pred)
+rmse(df_splits$validationset$medv, gam1_pred)
+rmse(df_splits$validationset$medv, gam2_pred)
+rmse(df_splits$validationset$medv, gam3_pred)
+# GAM with smoothing spline interacted with another variable.
+hv_gam4 = gam(medv~s(lstat,by=rm,bs='cr')+s(dis,bs='cr')+s(nox,bs='cr')+s(crim,bs='cr')+zn+indus+chas+rm+age+rad+tax+ptratio, data=df_splits$trainingset)
+summary(hv_gam4)
+gam4_pred = predict(hv_gam4,df_splits$validationset)
+rmse(df_splits$validationset$medv, lm_pred)
+rmse(df_splits$validationset$medv, gam1_pred)
+rmse(df_splits$validationset$medv, gam2_pred)
+rmse(df_splits$validationset$medv, gam3_pred)
+rmse(df_splits$validationset$medv, gam4_pred)
+# Test other interaction terms on your own time, we will return to this later, especially when comparing
+# to tree-based methods.
