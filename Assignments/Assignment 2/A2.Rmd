@@ -1,0 +1,198 @@
+---
+title: "ECON882 Assignment 2"
+author: "Mehtab Hanzroh"
+date: "2025-03-03"
+output: pdf_document
+---
+
+# ECON882 Assignment 1
+
+### Importing Libraries
+
+```{r libraries, include=FALSE}
+library(tidyverse)
+library(rsample)
+library(Metrics)
+library(GGally)
+library(glmnet)
+library(pROC)
+```
+
+### Loading Data
+
+```{r load_data}
+df = read.csv("../../Datasets/loan-defs.csv")
+```
+
+## Question 1
+
+```{r split}
+set.seed(2)
+df$loginc = log(df$income)
+df_split = initial_split(df,prop=0.75)
+df_train = training(df_split)
+df_test = testing(df_split)
+```
+
+## Question 2
+
+Let's start with a pairs plot.
+```{r pairs_plot, fig.width=12, fig.height=15, fig.align='center', out.width='100%', echo=FALSE}
+factorcols = c('default','gender','own','miss','educ')
+isfactor = names(df) %in% factorcols
+ggpairs(cbind(df[,!isfactor],lapply(df[,isfactor],as.factor)))
+```
+
+Based on the pairs plot, it is clear that gender and own are dummies, and thus will be included as-is in the linear model. The number of missed payments does not seem to have a strong non-linear relation with default, so we will include it as a continuous variable, although using dummies is certainly possible. Education does seem to have a non-linear relation, so we will use education dummies. The relation between default and age is harder to see, so let's plot the proportion of defaulters at each age.
+```{r def_age}
+ggplot(df, aes(x=factor(age),y=default)) + stat_summary(fun=mean)
+```
+A linear fit seems appropriate. We can create a binned scatter plot for income and balance.
+```{r def_loginc}
+ggplot(df) + stat_summary_bin(aes(x=loginc,y=default), fun.data=mean_se)
+```
+```{r def_balance}
+ggplot(df) + stat_summary_bin(aes(x=balance,y=default), fun.data=mean_se)
+```
+A quadratic seems sensible for both, but they may not work well due to the fact that this is a linear probability model. Let's check the model with and without using these quadratic terms.
+
+```{r def_lpm}
+def_lpm = lm(default ~ age + balance + loginc + gender + own + miss + 
+               factor(educ), data=df_train)
+summary(def_lpm)
+lpm_pred = predict(def_lpm,df_test)
+rmse(lpm_pred,df_test[,'default'])
+def_lpm2 = lm(default ~ age + poly(balance,2) + poly(loginc,2) + gender + own + miss + 
+                factor(educ), data=df_train)
+summary(def_lpm2)
+lpm2_pred = predict(def_lpm2,df_test)
+rmse(lpm2_pred,df_test[,'default'])
+```
+
+The model with quadratics leads to a negligible improvement in fit. To be parsimonious we will proceed with the model without quadratic terms.
+
+## Question 3
+
+Let's check the performance of logit models using the same explanatory variables as above.
+
+```{r logit}
+def_lgt = glm(default ~ age + balance + loginc + gender + own + miss + 
+                factor(educ), data=df_train, family='binomial')
+summary(def_lgt)
+lgt_pred = predict(def_lgt,df_test,type='response')
+rmse(lgt_pred,df_test[,'default'])
+def_lgt2 = glm(default ~ age + poly(balance,2) + poly(loginc,2) + gender + own + miss + 
+                 factor(educ), data=df_train, family='binomial')
+summary(def_lgt2)
+lgt2_pred = predict(def_lgt2,df_test,type='response')
+rmse(lgt2_pred,df_test[,'default'])
+```
+
+The logit models do perform better than the LPM. The model with quadratic terms only performs marginally better so, again, we will use the simpler model.
+
+## Question 4
+
+We first use model.matrix to get matrices that we can pass into glmnet, using our selected model's formula.
+
+```{r modmat}
+X_train = model.matrix(default ~ age + balance + loginc + gender + own + miss + 
+                         factor(educ) -1, data=df_train)
+y_train = df_train$default
+X_test = model.matrix(default ~ age + balance + loginc + gender + own + miss + 
+                        factor(educ) -1, data=df_test)
+y_test = df_test$default
+```
+
+Let's now estimate the lasso and ridge models with cv.glmnet.
+
+```{r lasso}
+def_lasso = cv.glmnet(X_train,y_train,nfolds=10,alpha=1,family='binomial')
+coef(def_lasso)
+```
+
+LASSO has aggressively shrunk a lot of the coefficients. Many have been set to zero, nearly including age and balance. It seems that the number of missed payments and the high education levels are strongly predictive of default, and they must be strongly correlated with the other variables. This seems to be supported by the pairs plot, apart from age and balance, which are not shrunk all the way to zero. Let's graph the regularization curve.
+
+```{r lasso_curve}
+plot(glmnet(X_train,y_train,alpha=1,family='binomial'))
+```
+
+LASSO shrinks most coefficients to 0 even for larger values of lambda. At first glance, it does seem that LASSO is too aggressive. Let's compare to the results from a ridge penalty.
+
+```{r ridge}
+def_ridge = cv.glmnet(X_train,y_train,nfolds=10,alpha=0,lambda.min=0.000001,family='binomial')
+coef(def_ridge)
+```
+Ridge does not shrink the coefficients of the variables nearly as much as LASSO. Interestingly, age and balance have still been shrunk quite a bit. Clearly, there must be a lot of co-linearity between these variables. Let's compare their RMSE.
+
+```{r lasso_ridge_rmse}
+lasso_pred = predict(def_lasso,X_test,type='response')
+ridge_pred = predict(def_ridge,X_test,type='response')
+rmse(lasso_pred,y_test)
+rmse(ridge_pred,y_test)
+```
+
+The ridge model seems to fit marginally better, although neither model does better than the logistic regression model! Thus, even with a tiny amount of regularization strength (lambda.min is small), the model performs worse than if we had not used a penalty at all. 
+
+## Question 5
+
+We will just use table to get these confusion matrices.
+
+```{r conf_mat}
+lpm_class_50 = lpm_pred > 0.5
+lpm_class_20 = lpm_pred > 0.2
+logit_class_50 = lgt_pred > 0.5
+logit_class_20 = lgt_pred > 0.2
+lasso_class_50 = lasso_pred > 0.5
+lasso_class_20 = lasso_pred > 0.2
+ridge_class_50 = ridge_pred > 0.5
+ridge_class_20 = ridge_pred > 0.2
+table(lpm_class_50,y_test)
+table(logit_class_50,y_test)
+table(lasso_class_50,y_test)
+table(ridge_class_50,y_test)
+table(lpm_class_20,y_test)
+table(logit_class_20,y_test)
+table(lasso_class_20,y_test)
+table(ridge_class_20,y_test)
+```
+The LPM certainly has the worst performance. Between un-penalized logit and the lasso/ridge models, logit has better overall performance with more entries on the diagonal, but lasso/ridge do a better job at classifying non-defaulters. Using the smaller threshold also seems to be a better choice here for overall classification performance, but ultimately this choice depends on the specific empirical use (i.e. loss function) of the model.
+
+## Question 6
+We will use pROC for this.
+
+```{r knn}
+lpm_roc = roc(df_test$default ~ lpm_pred)
+lgt_roc = roc(df_test$default ~ lgt_pred)
+lasso_roc = roc(df_test$default ~ lasso_pred)
+ridge_roc = roc(df_test$default ~ ridge_pred)
+plot(1-lpm_roc$specificities,lpm_roc$sensitivities,type='l',
+     xlab="False Positive Rate",ylab="True Positive Rate",main="ROC Curves")
+lines(1-lgt_roc$specificities,lgt_roc$sensitivities,col='red')
+lines(1-lasso_roc$specificities,lasso_roc$sensitivities,col='blue')
+lines(1-ridge_roc$specificities,ridge_roc$sensitivities,col='green')
+legend("bottomright",legend = c(paste0('LPM, AUC = ',round(lpm_roc$auc,4)), 
+                                paste0('Logit, AUC = ',round(lgt_roc$auc,4)), 
+                                paste0('LASSO, AUC = ',round(lasso_roc$auc,4)), 
+                                paste0('Ridge, AUC = ',round(ridge_roc$auc,4))),
+                                col=c('black','red','blue','green'),lty=1)
+```
+
+All models seem to perform similarly. Logit and Ridge do best for larger thresholds, and trade places with the LPM and LASSO for smaller thresholds. LPM actually seems to have the highest AUC, but all their AUC's are similar.
+
+## Question 7
+We will use ggplot for this.
+```{r hyp_knn}
+ggplot(data=df,mapping=aes(x=loginc)) + 
+  geom_histogram(aes(y = after_stat(density)),bins=200, alpha = 0.5) + 
+  geom_density(kernel='gaussian',aes(color = "Gaussian"), key_glyph = "path") + 
+  geom_density(kernel='epanechnikov',aes(color = "Epanechnikov (1.0)"), key_glyph = "path") +
+  geom_density(kernel='epanechnikov',adjust=1.5,aes(color = "Epanechnikov (1.5)"), key_glyph = "path") +
+  geom_density(kernel='epanechnikov',adjust=2/3,aes(color = "Epanechnikov (2/3)"), key_glyph = "path") +
+  scale_color_manual(name = "Kernel Type", 
+                        values = c("Gaussian" = "black", 
+                                   "Epanechnikov (1.0)" = "blue", 
+                                   "Epanechnikov (1.5)" = "red", 
+                                   "Epanechnikov (2/3)" = "green")) +
+  labs(x='Log(income)',y='Density',title='Kernel Density Curves')
+```
+The Gaussian and Epanechnikov kernels seem to produce very similar density curves, which is to be expected since the empirical distribution seems to be quite smooth. Clearly, the DGP has a large number of individuals at the minimum income (10,000), which produces a large bin at the left tail of the distribution. Only the curve with the larger bandwidth level in red seems to not be affected by this. For all curves, there is a large right tail which follows the empirical distribution reasonably well. The density curve with the smaller bandwidth level in green is certainly too rough. The red curve is probably a good choice among these four density curves, although a bandwidth level between that of the red and green curves may be more optimal.

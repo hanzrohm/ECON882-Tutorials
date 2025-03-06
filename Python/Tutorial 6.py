@@ -10,6 +10,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.model_selection import train_test_split
+import statsmodels.formula.api as smf
+# pygam library for GAMs
+import pygam
 
 ### GAMs ###
 # Loading a Dataset
@@ -19,3 +22,11 @@ sns.pairplot(df.drop('mpg',axis=1))
 
 # Splitting the sample
 np.random.seed(6)
+df_train, df_test = train_test_split(df,test_size=0.3)
+
+# To demonstrate the use of pyGAM, we first start with a simple
+# use-case. Here, we fit a gam with smoothing spline basis for
+# one variable, and dummy variables for another.
+lm_model = smf.ols('gpm ~ horsepower + C(origin)', data=df_train).fit()
+lm_model.summary()
+pred_lm = lm_model.predict(df_test)
