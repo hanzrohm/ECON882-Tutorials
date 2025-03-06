@@ -169,3 +169,6 @@ rmse(df_splits$validationset$medv, pred_rpart)
 rmse(df_splits$validationset$medv, pred_rf_optm)
 rmse(df_splits$validationset$medv, gam5_pred)
 rmse(df_splits$validationset$medv, gam6_pred)
+
+# Final Reported RMSE for chosen model in Test Set
+rmse(df_splits$testset$medv, pred_rf_optm)
