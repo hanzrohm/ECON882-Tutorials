@@ -6,6 +6,7 @@ setwd("")
 library(ISLR2)
 library(tidyverse)
 library(rsample)
+library(splines)
 # gam library to estimate gam's
 library(gam)
 # Metrics library for measures of fit
