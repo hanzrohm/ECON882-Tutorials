@@ -22,21 +22,22 @@ library(mlr3learners)
 library(grf)
 
 ### DDML ###
-
+set.seed(10)
 # Generating Fake Data
 # Y = m(X) + (W - e)*tau + sqrt(V) + rnorm(n)
 # when dgp = "simple", e = 0.4 + 0.20*1(X1>0), tau = max(X1,0) 
+# when dgp = "aw2", m = 0, e = 0.5, tau = f(X_1)f(X_2), f(x) = 1+1/(1+e^(-20(x-1/3))) 
 data = as.data.frame(generate_causal_data(n  = 20000,
                                           # number of features in X
                                           p  = 10,
                                           # sd for m
                                           sigma.m = 1,
                                           # sd for treatment effect
-                                          sigma.tau = 0.1,
+                                          sigma.tau = 0.5,
                                           # conditional sd for Y
                                           sigma.noise = 1,
                                           # DGP for treatment effect and propensity
-                                          dgp = "simple"))
+                                          dgp = "aw2"))
 
 
 ### OLS
@@ -85,3 +86,52 @@ dml_plr_obj = DoubleMLPLR$new(df, ml_g, ml_m, n_folds = 5, n_rep = 5)
 dml_plr_obj$fit()
 ## Results
 dml_plr_obj$summary()
+
+## Using lasso
+# LASSO for g()
+ml_g_lasso <- lrn("regr.cv_glmnet", s = "lambda.min", alpha = 1)
+# LASSO for m()
+ml_m_lasso = ml_g_lasso$clone()
+# Specifying full model
+dml_plr_obj2 = DoubleMLPLR$new(df, ml_g_lasso, ml_m_lasso, n_folds = 5, n_rep = 5)
+# Fitting model
+dml_plr_obj2$fit()
+# Results
+dml_plr_obj2$summary()
+
+### Generalized Random Forests
+# Random Forests for m()
+W_grf = regression_forest(X = data[1:10], Y = data$W, num.trees = 500, tune.parameters = "all")
+W_hat = W_grf$predictions       
+# Random Forests for g()
+Y_grf = regression_forest(X = data[1:10], Y = data$Y, num.trees = 500, tune.parameters = "all")
+Y_hat = Y_grf$predictions
+# Causal Forests
+cf = causal_forest(X = data[1:10], Y = data$Y, W = data$W, Y.hat = Y_hat, W.hat = W_hat, num.trees = 2000)
+# Note. If you know propensities, you can input them directly as W.hat.
+
+## Variable Importance
+var_imp = variable_importance(cf)
+var_imp
+
+## ATE
+cf_ATE = average_treatment_effect(cf)
+cf_ATE
+
+## Heterogeneous Treatment Effects or Conditional Average Treatment Effects (CATE)
+oob_pred = predict(cf, estimate.variance = TRUE)
+tau_hat = oob_pred$predictions
+tau_hat_se = sqrt(oob_pred$variance.estimates)
+hist(tau_hat, main="Causal forests: out-of-bag CATE")
+
+### DoubleML with Neural Networks
+# nn for g()
+nn_g = lrn("regr.nnet")
+# nn for m()
+nn_m = ml_g$clone()
+## Specifying full model
+dml_plr_obj_nn = DoubleMLPLR$new(df, nn_g, nn_m, n_folds = 5, n_rep = 5)
+## Fitting
+dml_plr_obj_nn$fit()
+## Results
+dml_plr_obj_nn$summary()

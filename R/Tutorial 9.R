@@ -49,7 +49,7 @@ hv_nn_norm |> evaluate(as.matrix(scale(df_test_X,means,SDs)),as.matrix(df_test_y
 hv_nn_lnorm = keras_model_sequential()
 hv_nn_lnorm |>
   # layer normalization
-  layer_normalization() |>
+  layer_normalization(input_shape = c(ncol(df_train_X))) |>
   # first hidden layer
   layer_dense(units=100, activation = 'relu') |>
   # second hidden layer
@@ -59,7 +59,7 @@ hv_nn_lnorm |>
 summary(hv_nn_lnorm)
 hv_nn_lnorm |> compile(optimizer = optimizer_adam(learning_rate = 0.001), loss = 'mse', metric = 'mae')
 nn_lnorm_hist = hv_nn_lnorm |> fit(as.matrix(df_train_X),as.matrix(df_train_y),
-                       epochs = 100, batch_size = 128)
+                       epochs = 100, batch_size = 32)
 hv_nn_lnorm |> evaluate(as.matrix(df_test_X),as.matrix(df_test_y))
 
 # batch normalization of features
@@ -105,7 +105,7 @@ hv_nn_norm |>
   layer_dense(units=50, activation = 'relu') |>
   # output layer
   layer_dense(units=1)
-summary(hv_nn)
+summary(hv_nn_norm)
 hv_nn_norm |> compile(optimizer = optimizer_adam(learning_rate = 0.0001), loss = 'mse', metric = 'mae')
 nn_norm_hist = hv_nn_norm |> fit(as.matrix(scale(df_train_X)),as.matrix(df_train_y),
                                  epochs = 1000, batch_size = 128)
@@ -127,7 +127,7 @@ hv_nn_drop |>
 summary(hv_nn_drop)
 hv_nn_drop |> compile(optimizer = 'rmsprop', loss = 'mse', metric = 'mae')
 nn_drop_hist = hv_nn_drop |> fit(as.matrix(scale(df_train_X)),as.matrix(df_train_y),
-                       epochs = 100, batch_size = 32)
+                       epochs = 200, batch_size = 128)
 hv_nn_drop |> evaluate(as.matrix(scale(df_test_X,means,SDs)),as.matrix(df_test_y))
 
 ## Validation Sample
@@ -142,5 +142,5 @@ hv_nn_val |>
 summary(hv_nn_val)
 hv_nn_val |> compile(optimizer = optimizer_adam(learning_rate = 0.001), loss = 'mse', metric = 'mae')
 nn_val_hist = hv_nn_val |> fit(as.matrix(scale(df_train_X)),as.matrix(df_train_y),
-                       epochs = 1000, batch_size = 32, validation_split = 0.2)
+                       epochs = 200, batch_size = 32, validation_split = 0.2)
 hv_nn_val |> evaluate(as.matrix(scale(df_test_X,means,SDs)),as.matrix(df_test_y))
